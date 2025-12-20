@@ -3,11 +3,12 @@
 This is the file streamer used in Blockhead's file browser. I am not going to spend time documenting it properly unless someone asks me to. If you like the way Blockhead does things and want to use this but you are having trouble getting it to build because of [my stupid dependency management system](https://github.com/colugomusic/dope) then let me know and i will help you out.
 
 - Supports WAV, MP3, FLAC and WavPack.
-- Can immediately start playing back audio files without loading the entire file into memory first.
+- Immediately starts playing back audio files without loading the entire file into memory first.
 - Provides an interface for seeking around in the file.
-- A background thread is automatically created which does the loading.
+- A thread is automatically created which does the loading of audio chunks in the background.
 - Loaded chunks are kept in memory until the streamer is destroyed (rather than using a rolling window strategy.)
 - Provides an interface to get information about which chunks have been loaded.
+- There is no "stop" operation. Just delete the streamer and everything will be cleaned up properly. You can implement a "pause" yourself - just stop calling `process` and the playhead will stay where it is until you resume.
 
 ## MP3 caveats
 
