@@ -349,9 +349,8 @@ auto process_playback(ez::audio_t th, detail::servo* servo, detail::shared_atomi
 	const auto fr_end = servo->playback_pos + (64 * frame_inc);
 	const auto chunk_beg = get_chunk_idx<CHUNK_SIZE>(fr_beg);
 	const auto chunk_end = get_chunk_idx<CHUNK_SIZE>(fr_end);
-	const auto signal    = playback_frames(th, servo, model, chunk_beg, chunk_end, SR, frame_inc, signal);
+	playback_frames(th, servo, model, chunk_beg, chunk_end, SR, frame_inc, signal);
 	report_playback_pos_if_requested(th, servo, atomics, servo->playback_pos);
-	return signal;
 }
 
 template <size_t CHUNK_SIZE> static
