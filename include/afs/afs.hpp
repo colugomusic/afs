@@ -130,23 +130,8 @@ auto get_estimated_frame_count(const model<CHUNK_SIZE>& x) -> ads::frame_count {
 }
 
 template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE> [[nodiscard]] static
-auto is_valid(const impl<Stream, CHUNK_SIZE>* x) -> bool {
-	return bool(x->loader.stream);
-}
-
-template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE> [[nodiscard]] static
 auto can_seek(ez::nort_t th, const impl<Stream, CHUNK_SIZE>* x) -> bool {
-	return is_valid(x) && can_seek(x->shared.model.read(th));
-}
-
-template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE> [[nodiscard]] static
-auto can_play(const impl<Stream, CHUNK_SIZE>* x) -> bool {
-	return is_valid(x);
-}
-
-template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE> [[nodiscard]] static
-auto is_playing(ez::nort_t th, const impl<Stream, CHUNK_SIZE>* x) -> bool {
-	return is_valid(x);
+	return can_seek(x->shared.model.read(th));
 }
 
 template <size_t CHUNK_SIZE> [[nodiscard]] static
@@ -391,9 +376,7 @@ auto seek(ez::nort_t th, impl<Stream, CHUNK_SIZE>* x, ads::frame_idx pos) -> voi
 
 template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE> static
 auto request_playback_pos(ez::nort_t th, impl<Stream, CHUNK_SIZE>* x) -> void {
-	if (is_playing(th, x)) {
-		x->shared.atomics.request_playback_pos.store(true, std::memory_order_relaxed);
-	}
+	x->shared.atomics.request_playback_pos.store(true, std::memory_order_relaxed);
 }
 
 } // afs::detail
@@ -403,7 +386,6 @@ namespace afs {
 template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE, size_t BUFFER_SIZE>
 struct streamer {
 	streamer(ez::nort_t, Stream stream);
-	[[nodiscard]] auto is_playing(ez::nort_t) const -> bool;
 	[[nodiscard]] auto get_chunk_info(ez::nort_t, tmp_alloc& alloc) const -> tmp_vec<bool>;
 	[[nodiscard]] auto get_estimated_frame_count(ez::nort_t) const -> ads::frame_count;
 	[[nodiscard]] auto get_header(ez::nort_t) const -> audiorw::header;
@@ -420,11 +402,6 @@ streamer<Stream, CHUNK_SIZE, BUFFER_SIZE>::streamer(ez::nort_t th, Stream stream
 	: impl_{std::make_unique<detail::impl<Stream, CHUNK_SIZE>>()}
 {
 	detail::init(th, impl_.get(), std::move(stream));
-}
-
-template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE, size_t BUFFER_SIZE>
-auto streamer<Stream, CHUNK_SIZE, BUFFER_SIZE>::is_playing(ez::nort_t th) const -> bool {
-	return detail::is_playing(th, impl_.get());
 }
 
 template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE, size_t BUFFER_SIZE>
