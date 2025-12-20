@@ -12,7 +12,6 @@ This is the file streamer used in Blockhead's file browser. If you like the way 
 - There is no "stop" operation. Just delete the streamer and everything will be cleaned up properly. You can implement a "pause" yourself - just stop calling `process` and the playhead will stay where it is until you resume.
 
 ## API
-See [test/src/main.cpp](test/src/main.cpp) for a usage example.
 
 `streamer(ez::nort_t, Stream stream)`
 
