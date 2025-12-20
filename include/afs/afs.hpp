@@ -18,6 +18,9 @@ static constexpr auto DEFAULT_CHUNK_SIZE = 1 << 16;
 
 template <typename T> using shptr = std::shared_ptr<T>;
 template <typename T> using uptr  = std::unique_ptr<T>;
+template <typename T, typename... Args> auto make_shptr(Args&&... args) { return std::make_shared<T>(std::forward<Args>(args)...); }
+template <typename T, typename... Args> auto make_uptr(Args&&... args)  { return std::make_unique<T>(std::forward<Args>(args)...); }
+
 using tmp_alloc = foonathan::memory::temporary_allocator;
 template <typename T> using tmp_vec = foonathan::memory::vector<T, tmp_alloc>;
 using output_signal = std::array<std::span<float>, 2>;
