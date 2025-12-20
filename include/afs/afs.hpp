@@ -271,14 +271,15 @@ auto get_local_chunk_frame(ads::frame_idx fr) -> ads::frame_idx {
 }
 
 template <size_t CHUNK_SIZE> static
-auto finish_if_reached_end(ez::audio_t, detail::servo* servo, detail::model<CHUNK_SIZE> model) -> void {
+auto finish_if_reached_end(ez::audio_t, detail::servo* servo, detail::shared_atomics* atomics, detail::model<CHUNK_SIZE> model) -> void {
 	if (servo->playback_pos >= get_estimated_frame_count(model)) {
 		servo->state = state::finished;
+		atomics->reported_finished.store(true, std::memory_order_relaxed);
 	}
 }
 
 template <size_t CHUNK_SIZE, size_t BUFFER_SIZE> static
-auto playback_single_chunk(ez::audio_t th, detail::servo* servo, detail::model<CHUNK_SIZE> model, size_t chunk_idx, double SR, double frame_inc, output_signal signal) -> void {
+auto playback_single_chunk(ez::audio_t th, detail::servo* servo, detail::shared_atomics* atomics, detail::model<CHUNK_SIZE> model, size_t chunk_idx, double SR, double frame_inc, output_signal signal) -> void {
 	if (const auto chunk = model.loaded_chunks.find(chunk_idx)) {
 		for (ads::channel_idx ch; ch < std::min(ads::channel_count{2}, model.header.channel_count); ch++) {
 			auto& signal_row = signal.at(ch.value);
@@ -289,12 +290,12 @@ auto playback_single_chunk(ez::audio_t th, detail::servo* servo, detail::model<C
 			}
 		}
 		servo->playback_pos += BUFFER_SIZE * frame_inc;
-		finish_if_reached_end(th, servo, model);
+		finish_if_reached_end(th, servo, atomics, model);
 	}
 }
 
 template <size_t CHUNK_SIZE, size_t BUFFER_SIZE> static
-auto playback_chunk_transition(ez::audio_t th, detail::servo* servo, detail::model<CHUNK_SIZE> model, size_t chunk_idx, double SR, double frame_inc, output_signal signal) -> void {
+auto playback_chunk_transition(ez::audio_t th, detail::servo* servo, detail::shared_atomics* atomics, detail::model<CHUNK_SIZE> model, size_t chunk_idx, double SR, double frame_inc, output_signal signal) -> void {
 	for (ads::channel_idx ch; ch < std::min(ads::channel_count{2}, model.header.channel_count); ch++) {
 		auto& signal_row = signal.at(ch.value);
 		auto fr          = servo->playback_pos;
@@ -311,13 +312,13 @@ auto playback_chunk_transition(ez::audio_t th, detail::servo* servo, detail::mod
 		}
 	}
 	servo->playback_pos += BUFFER_SIZE * frame_inc;
-	finish_if_reached_end(th, servo, model);
+	finish_if_reached_end(th, servo, atomics, model);
 }
 
 template <size_t CHUNK_SIZE, size_t BUFFER_SIZE> static
-auto playback_frames(ez::audio_t th, detail::servo* servo, detail::model<CHUNK_SIZE> model, size_t chunk_beg, size_t chunk_end, double SR, double frame_inc, output_signal signal) -> void {
-	if (chunk_beg == chunk_end) { return playback_single_chunk<CHUNK_SIZE, BUFFER_SIZE>(th, servo, model, chunk_beg, SR, frame_inc, signal); }
-	else                        { return playback_chunk_transition<CHUNK_SIZE, BUFFER_SIZE>(th, servo, model, chunk_beg, SR, frame_inc, signal); }
+auto playback_frames(ez::audio_t th, detail::servo* servo, detail::shared_atomics* atomics, detail::model<CHUNK_SIZE> model, size_t chunk_beg, size_t chunk_end, double SR, double frame_inc, output_signal signal) -> void {
+	if (chunk_beg == chunk_end) { return playback_single_chunk<CHUNK_SIZE, BUFFER_SIZE>(th, servo, atomics, model, chunk_beg, SR, frame_inc, signal); }
+	else                        { return playback_chunk_transition<CHUNK_SIZE, BUFFER_SIZE>(th, servo, atomics, model, chunk_beg, SR, frame_inc, signal); }
 }
 
 template <size_t CHUNK_SIZE, size_t BUFFER_SIZE> static
@@ -331,7 +332,7 @@ auto process_playback(ez::audio_t th, detail::servo* servo, detail::shared_atomi
 	const auto fr_end = servo->playback_pos + (64 * frame_inc);
 	const auto chunk_beg = get_chunk_idx<CHUNK_SIZE>(fr_beg);
 	const auto chunk_end = get_chunk_idx<CHUNK_SIZE>(fr_end);
-	playback_frames<CHUNK_SIZE, BUFFER_SIZE>(th, servo, model, chunk_beg, chunk_end, SR, frame_inc, signal);
+	playback_frames<CHUNK_SIZE, BUFFER_SIZE>(th, servo, atomics, model, chunk_beg, chunk_end, SR, frame_inc, signal);
 	report_playback_pos_if_requested(th, servo, atomics, servo->playback_pos);
 }
 
@@ -357,6 +358,11 @@ auto get_chunk_info(ez::nort_t th, impl<Stream, CHUNK_SIZE>* x, tmp_alloc& alloc
 template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE> [[nodiscard]] static
 auto get_estimated_frame_count(ez::nort_t th, impl<Stream, CHUNK_SIZE>* x) -> ads::frame_count {
 	return get_estimated_frame_count(x->shared.model.read(th));
+}
+
+template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE> [[nodiscard]] static
+auto is_playing(ez::nort_t th, const impl<Stream, CHUNK_SIZE>* x) -> bool {
+	return !x->shared.atomics.reported_finished.load(std::memory_order_relaxed);
 }
 
 template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE> [[nodiscard]] static
@@ -390,6 +396,7 @@ struct streamer {
 	[[nodiscard]] auto get_estimated_frame_count(ez::nort_t) const -> ads::frame_count;
 	[[nodiscard]] auto get_header(ez::nort_t) const -> audiorw::header;
 	[[nodiscard]] auto get_playback_pos(ez::ui_t) -> double;
+	[[nodiscard]] auto is_playing(ez::nort_t) const -> bool;
 	auto process(ez::audio_t, double SR, output_signal stereo_out) -> void;
 	auto request_playback_pos(ez::nort_t) -> void;
 	auto seek(ez::nort_t, ads::frame_idx pos) -> void;
@@ -427,6 +434,11 @@ auto streamer<Stream, CHUNK_SIZE, BUFFER_SIZE>::get_header(ez::nort_t th) const 
 template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE, size_t BUFFER_SIZE>
 auto streamer<Stream, CHUNK_SIZE, BUFFER_SIZE>::get_playback_pos(ez::ui_t) -> double {
 	return detail::get_playback_pos(ez::ui, impl_.get());
+}
+
+template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE, size_t BUFFER_SIZE>
+auto streamer<Stream, CHUNK_SIZE, BUFFER_SIZE>::is_playing(ez::nort_t th) const -> bool {
+	return detail::is_playing(th, impl_.get());
 }
 
 template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE, size_t BUFFER_SIZE>

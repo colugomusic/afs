@@ -19,5 +19,6 @@ TEST_CASE("compiles") {
 		test_streamer.seek(ez::ui, {100});
 		const auto header  = test_streamer.get_header(ez::ui);
 		const auto frs     = test_streamer.get_estimated_frame_count(ez::ui);
+		const auto playing = test_streamer.is_playing(ez::ui);
 	}
 }
