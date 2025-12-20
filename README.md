@@ -14,27 +14,47 @@ This is the file streamer used in Blockhead's file browser. If you like the way 
 ## API
 See [test/src/main.cpp](test/src/main.cpp) for a usage example.
 
-### `streamer(ez::nort_t, Stream stream)`
+`streamer(ez::nort_t, Stream stream)`
 
 `Stream` is anything that provides the `audiorw::concepts::item_input_stream` concept. `audiorw` provides `audiorw::stream_item_from_bytes` and `audiorw::stream_item_from_fs_path`.
 
-### `[[nodiscard]] auto get_chunk_info(ez::nort_t, afs::tmp_alloc& alloc) const -> afs::tmp_vec<bool>`
+`[[nodiscard]] auto get_chunk_info(ez::nort_t, afs::tmp_alloc& alloc) const -> afs::tmp_vec<bool>`
 
-### `[[nodiscard]] auto get_estimated_frame_count(ez::nort_t) const -> ads::frame_count`
+Returns a list of chunks, true or false, depending on if they are loaded or not. The list may be less than the total number of chunks. The remaining chunks are not loaded. For example if there are 5 chunks and this function returns `[true, false, true]` then the final two chunks are implicitly `[false, false]`. The total number of chunks is `get_estimated_frame_count() * CHUNK_SIZE`.
 
-### `[[nodiscard]] auto get_header(ez::nort_t) const -> audiorw::header`
+`[[nodiscard]] auto get_estimated_frame_count(ez::nort_t) const -> ads::frame_count`
 
-### `[[nodiscard]] auto get_playback_pos(ez::ui_t) -> double`
+For non-MP3 files, returns the exact number of audio frames. For MP3 files, see the caveats below.
 
-### `auto process(ez::audio_t, double SR, afs::output_signal stereo_out) -> void`
+`[[nodiscard]] auto get_header(ez::nort_t) const -> audiorw::header`
 
-### `auto request_playback_pos(ez::nort_t) -> void`
+Returns the audiorw header.
 
-### `auto seek(ez::nort_t, ads::frame_idx pos) -> void`
+`[[nodiscard]] auto get_playback_pos(ez::ui_t) -> double`
+
+Returns the playback position.
+
+`[[nodiscard]] auto is_playing(ez::nort_t) const -> bool`
+
+Returns false if the playback got to the end. The playback automatically stops in this case.
+
+`auto process(ez::audio_t, double SR, afs::output_signal stereo_out) -> void`
+
+This is the realtime-safe audio processing function. `afs::output_signal` is `std::array<float* 2>` for your two channels of audio data. If the input stream is mono then only the first buffer is written to. If you feel like forking the library, it would be pretty easy to support a dynamic number of channels. I just don't need it myself, yet.
+
+`auto request_playback_pos(ez::nort_t) -> void`
+
+Triggers the realtime audio thread to report the playback position so that it can be queried by other threads using `get_playback_pos()`.
+
+The background loader thread will call this automatically between each chunk but you can call it more often in your UI thread if you want to.
+
+`auto seek(ez::nort_t, ads::frame_idx pos) -> void`
+
+Seek to the given position within the stream.
 
 ## MP3 caveats
 
 Miniaudio cannot seek within an MP3 file, or tell us how many frames it contains, without loading the entire file, so MP3s will act slightly differently:
 
-- The streamer can provide an estimate of the total frame count based on how many frames have been loaded so far vs how many bytes of the stream have been consumed. For non-MP3s the same function will return the actual frame count instead of an estimate.
+- `get_estimated_frame_count` returns an estimate of the total frame count based on how many frames have been loaded so far, vs how many bytes of the stream have been consumed. For non-MP3s the same function will return the actual frame count instead of an estimate.
 - Trying to seek to an unloaded part of an MP3 will cause the streamer to pause playback until that chunk is loaded.
