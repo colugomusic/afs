@@ -15,7 +15,7 @@ This is the file streamer used in Blockhead's file browser. If you like the way 
 
 `streamer(ez::nort_t, Stream stream)`
 
-`Stream` is anything that provides the `audiorw::concepts::item_input_stream` concept. `audiorw` provides `audiorw::stream_item_from_bytes` and `audiorw::stream_item_from_fs_path`.
+`Stream` is anything that satisfies the `audiorw::concepts::item_input_stream` concept. `audiorw` provides `audiorw::stream_item_from_bytes` and `audiorw::stream_item_from_fs_path`.
 
 `[[nodiscard]] auto get_chunk_info(ez::nort_t, afs::tmp_alloc& alloc) const -> afs::tmp_vec<bool>`
 
