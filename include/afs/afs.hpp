@@ -454,7 +454,7 @@ auto streamer<Stream, CHUNK_SIZE, BUFFER_SIZE>::get_playback_pos(ez::ui_t) -> do
 
 template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE, size_t BUFFER_SIZE>
 auto streamer<Stream, CHUNK_SIZE, BUFFER_SIZE>::seek(ez::nort_t th, ads::frame_idx pos) -> void {
-	return detail::seek<BUFFER_SIZE>(th, impl_.get(), pos);
+	return detail::seek<Stream, CHUNK_SIZE, BUFFER_SIZE>(th, impl_.get(), pos);
 }
 
 template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE, size_t BUFFER_SIZE>
