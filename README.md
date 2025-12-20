@@ -4,6 +4,7 @@ This is the file streamer used in Blockhead's file browser. I am not going to sp
 
 - Supports WAV, MP3, FLAC and WavPack.
 - Immediately starts playing back audio files without loading the entire file into memory first.
+- The `process` function is realtime-safe. Everything else is not. [ez annoations](https://github.com/colugomusic/ez) are used to clearly denote the realtime-safe part of the API.
 - Provides an interface for seeking around in the file.
 - A thread is automatically created which does the loading of audio chunks in the background.
 - Loaded chunks are kept in memory until the streamer is destroyed (rather than using a rolling window strategy.)
