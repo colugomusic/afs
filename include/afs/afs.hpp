@@ -305,9 +305,7 @@ auto playback_single_chunk(ez::audio_t th, detail::servo* servo, detail::model<C
 		}
 		servo->playback_pos += 64 * frame_inc;
 		finish_if_reached_end(th, servo, model);
-		return signal;
 	}
-	return {};
 }
 
 template <size_t CHUNK_SIZE> static
@@ -329,7 +327,6 @@ auto playback_chunk_transition(ez::audio_t th, detail::servo* servo, detail::mod
 	}
 	servo->playback_pos += 64 * frame_inc;
 	finish_if_reached_end(th, servo, model);
-	return signal;
 }
 
 template <size_t CHUNK_SIZE> static

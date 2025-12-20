@@ -11,5 +11,7 @@ TEST_CASE("null test") {
 	if (const auto format_hint = audiorw::make_format_hint(TEST_WAV, true)) {
 		auto stream = audiorw::stream::item::from(TEST_WAV, *format_hint);
 		auto test_streamer = afs::make_uptr<streamer>(ez::ui, std::move(stream));
+		auto signal        = afs::output_signal{};
+		test_streamer->process(ez::audio, 44100, signal);
 	}
 }
