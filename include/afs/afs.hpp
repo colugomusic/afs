@@ -175,7 +175,7 @@ auto get_next_chunk_to_load_forward(size_t chunk_just_loaded, std::optional<size
 template <size_t CHUNK_SIZE> [[nodiscard]] static
 auto get_next_chunk_to_load_random(const model<CHUNK_SIZE>& x, const detail::shared_safe<CHUNK_SIZE>& shared, std::optional<size_t> end_chunk) -> std::optional<size_t> {
 	const auto playback_pos   = shared.atomics.reported_playback_pos.load(std::memory_order_relaxed);
-	const auto playback_chunk = get_chunk_idx(playback_pos);
+	const auto playback_chunk = get_chunk_idx<CHUNK_SIZE>(playback_pos);
 	auto check_chunk = playback_chunk;
 	for (;;) {
 		if (!x.loaded_chunks.find(check_chunk)) {
@@ -230,7 +230,7 @@ auto load_proc(std::stop_token stop, detail::loader<Stream>* loader, detail::sha
 			return;
 		}
 		shared->atomics.request_playback_pos.store(true, std::memory_order_relaxed);
-		loader->stream->seek(get_chunk_beg<CHUNK_SIZE>>(current_chunk_idx));
+		loader->stream->seek(get_chunk_beg<CHUNK_SIZE>(current_chunk_idx));
 		auto span = std::span{interleaved.data(), interleaved_buffer_size};
 		const auto frames_read = loader->stream->read_frames(span);
 		total_frames_read += frames_read;
@@ -245,9 +245,9 @@ auto load_proc(std::stop_token stop, detail::loader<Stream>* loader, detail::sha
 			.data = make_shptr<ads::stereo<float, CHUNK_SIZE>>()
 		};
 		ads::deinterleave(interleaved, chunk.data->begin());
-		model = shared->model.update_publish(th, [=](detail::model x) {
+		model = shared->model.update_publish(th, [=](detail::model<CHUNK_SIZE> x) {
 			x.loaded_chunks = x.loaded_chunks.insert(chunk);
-			if (just_found_end_chunk)  { x.header.frame_count = calculate_frame_count_from_end_chunk(*end_chunk, frames_read); }
+			if (just_found_end_chunk)  { x.header.frame_count = calculate_frame_count_from_end_chunk<CHUNK_SIZE>(*end_chunk, frames_read); }
 			if (!x.header.frame_count) { x.estimated_frame_count = estimate_frame_count(total_frames_read, loader->stream->get_total_bytes_read(), x.header.stream_length); }
 			return x;
 		});
@@ -264,7 +264,7 @@ template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE> static
 auto init(ez::nort_t th, impl<Stream, CHUNK_SIZE>* x, Stream stream) -> void {
 	x->loader.stream = make_uptr<Stream>(std::move(stream));
 	x->loader.thread = std::jthread{load_proc<Stream, CHUNK_SIZE>, &x->loader, &x->shared};
-	x->shared.model.set_publish(th, make_initial_model(x->loader.stream->get_header()));
+	x->shared.model.set_publish(th, make_initial_model<CHUNK_SIZE>(x->loader.stream->get_header()));
 }
 
 static
