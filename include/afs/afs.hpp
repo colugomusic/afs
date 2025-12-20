@@ -91,7 +91,7 @@ auto quantize(auto v, auto step) {
 template <size_t CHUNK_SIZE, size_t BUFFER_SIZE> [[nodiscard]] static
 auto fn_seek(ads::frame_idx pos) {
 	return [pos](model<CHUNK_SIZE> x) {
-		x.target.seek_pos = {quantize(pos.value, BUFFER_SIZE)};
+		x.target.seek_pos = {quantize(pos.value, static_cast<int64_t>(BUFFER_SIZE))};
 		return x;
 	};
 }
