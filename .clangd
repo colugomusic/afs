@@ -1,0 +1,8 @@
+CompileFlags:
+  CompilationDatabase: z:/dv/_bld/afs-ninja-msvc
+  Add: -Wunused-function
+
+Diagnostics:
+  ClangTidy:
+    Enable: true
+    Add: bugprone-use-after-move
