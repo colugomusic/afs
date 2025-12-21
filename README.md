@@ -31,7 +31,7 @@ Returns the audiorw header.
 
 `[[nodiscard]] auto get_playback_pos(ez::ui_t) -> double`
 
-Returns the playback position.
+Returns the last reported playback position (see  `request_playback_pos` below.)
 
 `[[nodiscard]] auto is_playing(ez::nort_t) const -> bool`
 
@@ -43,7 +43,7 @@ This is the realtime-safe audio processing function. `afs::output_signal` is `st
 
 `auto request_playback_pos(ez::nort_t) -> void`
 
-Triggers the realtime audio thread to report the playback position so that it can be queried by other threads using `get_playback_pos()`.
+Requests the realtime audio thread to report the playback position so that it can be queried by other threads using `get_playback_pos()`.
 
 The background loader thread will call this automatically between each chunk but you can call it more often in your UI thread if you want to.
 
