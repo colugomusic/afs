@@ -35,7 +35,7 @@ Returns the last reported playback position (see  `request_playback_pos` below.)
 
 `[[nodiscard]] auto is_playing(ez::nort_t) const -> bool`
 
-Returns false if the playback got to the end. The playback automatically stops in this case. (Further calls to `process` will produce silence.)
+Returns false if the playback got to the end. The playback automatically stops in this case. (Further calls to `process()` will produce silence.)
 
 `auto process(ez::audio_t, double SR, afs::output_signal stereo_out) -> void`
 
