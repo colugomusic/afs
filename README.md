@@ -43,9 +43,7 @@ This is the realtime-safe audio processing function. `afs::output_signal` is `st
 
 `auto request_playback_pos(ez::nort_t) -> void`
 
-Requests the realtime audio thread to report the playback position so that it can be queried by other threads using `get_playback_pos()`.
-
-The background loader thread will call this automatically between each chunk but you can call it more often in your UI thread if you want to.
+Requests the realtime audio thread to report the playback position, which can then be queried later by other threads using `get_playback_pos()`. Note that `process()` needs to be running for this to have any effect.
 
 `auto seek(ez::nort_t, ads::frame_idx pos) -> void`
 
