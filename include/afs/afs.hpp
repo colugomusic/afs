@@ -41,7 +41,7 @@ struct target {
 template <size_t CHUNK_SIZE>
 struct chunk {
 	size_t id = 0; // The ID is also the chunk index.
-	shptr<ads::stereo<float, CHUNK_SIZE>> data;
+	shptr<const ads::stereo<float, CHUNK_SIZE>> data;
 };
 
 template <size_t CHUNK_SIZE>
@@ -225,14 +225,15 @@ auto load_proc(std::stop_token stop, detail::loader<Stream>* loader, detail::sha
 			end_chunk = current_chunk_idx;
 			just_found_end_chunk = true;
 		}
-		auto chunk = detail::chunk{
+		auto chunk_data = make_shptr<ads::stereo<float, CHUNK_SIZE>>();
+		ads::deinterleave(interleaved, chunk_data->begin());
+		auto chunk = detail::chunk<CHUNK_SIZE>{
 			.id   = current_chunk_idx,
-			.data = make_shptr<ads::stereo<float, CHUNK_SIZE>>()
+			.data = chunk_data
 		};
-		ads::deinterleave(interleaved, chunk.data->begin());
 		model = shared->model.update_publish(th, [=](detail::model<CHUNK_SIZE> x) {
 			x.loaded_chunks = x.loaded_chunks.insert(chunk);
-			if (just_found_end_chunk)  { x.header.frame_count = calculate_frame_count_from_end_chunk<CHUNK_SIZE>(*end_chunk, frames_read); }
+			if (just_found_end_chunk)  { x.header.frame_count = x.header.frame_count.value_or(calculate_frame_count_from_end_chunk<CHUNK_SIZE>(*end_chunk, frames_read)); }
 			if (!x.header.frame_count) { x.estimated_frame_count = estimate_frame_count(total_frames_read, loader->stream->get_total_bytes_read(), x.header.stream_length); }
 			return x;
 		});
