@@ -31,21 +31,19 @@ Returns the audiorw header.
 
 `[[nodiscard]] auto get_playback_pos(ez::ui_t) -> double`
 
-Returns the playback position.
+Returns the last reported playback position (see  `request_playback_pos` below.)
 
 `[[nodiscard]] auto is_playing(ez::nort_t) const -> bool`
 
-Returns false if the playback got to the end. The playback automatically stops in this case.
+Returns false if the playback got to the end. The playback automatically stops in this case. (Further calls to `process()` will produce silence.)
 
 `auto process(ez::audio_t, double SR, afs::output_signal stereo_out) -> void`
 
-This is the realtime-safe audio processing function. `afs::output_signal` is `std::array<float* 2>` for your two channels of audio data. If the input stream is mono then only the first buffer is written to. If you feel like forking the library, it would be pretty easy to support a dynamic number of channels. I just don't need it myself, yet.
+This is the realtime-safe audio processing function. `afs::output_signal` is `std::array<float*, 2>` for your two channels of audio data. If the input stream is mono then only the first buffer is written to. If you feel like forking the library, it would be pretty easy to support a dynamic number of channels. I just don't need it myself, yet.
 
 `auto request_playback_pos(ez::nort_t) -> void`
 
-Triggers the realtime audio thread to report the playback position so that it can be queried by other threads using `get_playback_pos()`.
-
-The background loader thread will call this automatically between each chunk but you can call it more often in your UI thread if you want to.
+Requests the realtime audio thread to report the playback position, which can then be queried later by other threads using `get_playback_pos()`. Note that `process()` needs to be running for this to have any effect.
 
 `auto seek(ez::nort_t, ads::frame_idx pos) -> void`
 
