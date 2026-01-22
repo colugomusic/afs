@@ -1,5 +1,6 @@
 #pragma once
 
+#include "jthread/jthread.hpp"
 #include <ads-vocab.hpp>
 #include <audiorw.hpp>
 #include <concepts>
