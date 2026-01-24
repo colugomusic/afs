@@ -1,5 +1,6 @@
 #pragma once
 
+#include "afs-mem-alloc-tmp.hpp"
 #include "jthread/jthread.hpp"
 #include <ads-vocab.hpp>
 #include <audiorw.hpp>
@@ -7,7 +8,6 @@
 #include <ez.hpp>
 #include <filesystem>
 #include <foonathan/memory/container.hpp>
-#include <foonathan/memory/temporary_allocator.hpp>
 #include <memory>
 #include <immer/table.hpp>
 
@@ -22,8 +22,7 @@ template <typename T> using uptr  = std::unique_ptr<T>;
 template <typename T, typename... Args> auto make_shptr(Args&&... args) { return std::make_shared<T>(std::forward<Args>(args)...); }
 template <typename T, typename... Args> auto make_uptr(Args&&... args)  { return std::make_unique<T>(std::forward<Args>(args)...); }
 
-using tmp_alloc = foonathan::memory::temporary_allocator;
-template <typename T> using tmp_vec = foonathan::memory::vector<T, tmp_alloc>;
+template <typename T> using tmp_vec = foonathan::memory::vector<T, mem::alloc::tmp>;
 using output_signal = std::array<float*, 2>;
 
 } // afs
@@ -110,7 +109,7 @@ auto can_seek(const model<CHUNK_SIZE>& x) -> bool {
 }
 
 template <size_t CHUNK_SIZE> [[nodiscard]] static
-auto get_chunk_info(const model<CHUNK_SIZE>& x, tmp_alloc& alloc) -> tmp_vec<bool> {
+auto get_chunk_info(const model<CHUNK_SIZE>& x, mem::alloc::tmp& alloc) -> tmp_vec<bool> {
 	auto list = tmp_vec<bool>{alloc};
 	list.reserve(x.loaded_chunks.size() * 2);
 	for (const auto& chunk : x.loaded_chunks) {
@@ -353,7 +352,7 @@ auto process(ez::audio_t th, impl<Stream, CHUNK_SIZE>* x, double SR, output_sign
 }
 
 template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE> [[nodiscard]] static
-auto get_chunk_info(ez::nort_t th, impl<Stream, CHUNK_SIZE>* x, tmp_alloc& alloc) -> tmp_vec<bool> {
+auto get_chunk_info(ez::nort_t th, impl<Stream, CHUNK_SIZE>* x, mem::alloc::tmp& alloc) -> tmp_vec<bool> {
 	return get_chunk_info(x->shared.model.read(th), alloc);
 }
 
@@ -394,7 +393,7 @@ namespace afs {
 template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE, size_t BUFFER_SIZE>
 struct streamer {
 	streamer(ez::nort_t, Stream stream);
-	[[nodiscard]] auto get_chunk_info(ez::nort_t, tmp_alloc& alloc) const -> tmp_vec<bool>;
+	[[nodiscard]] auto get_chunk_info(ez::nort_t, mem::alloc::tmp& alloc) const -> tmp_vec<bool>;
 	[[nodiscard]] auto get_estimated_frame_count(ez::nort_t) const -> ads::frame_count;
 	[[nodiscard]] auto get_header(ez::nort_t) const -> audiorw::header;
 	[[nodiscard]] auto get_playback_pos(ez::ui_t) -> double;
@@ -419,7 +418,7 @@ auto streamer<Stream, CHUNK_SIZE, BUFFER_SIZE>::process(ez::audio_t th, double S
 }
 
 template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE, size_t BUFFER_SIZE>
-auto streamer<Stream, CHUNK_SIZE, BUFFER_SIZE>::get_chunk_info(ez::nort_t th, tmp_alloc& alloc) const -> tmp_vec<bool> {
+auto streamer<Stream, CHUNK_SIZE, BUFFER_SIZE>::get_chunk_info(ez::nort_t th, mem::alloc::tmp& alloc) const -> tmp_vec<bool> {
 	return detail::get_chunk_info(th, impl_.get(), alloc);
 }
 
