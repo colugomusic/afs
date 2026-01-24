@@ -3,7 +3,6 @@ project(afs)
 enable_testing()
 find_package(audiorw REQUIRED)
 find_package(ez REQUIRED)
-find_package(foonathan_memory REQUIRED)
 find_package(Immer REQUIRED)
 add_library(afs INTERFACE)
 add_library(afs::afs ALIAS afs)
@@ -13,12 +12,10 @@ target_sources(afs PUBLIC
 		include/afs
 	FILES
 		include/afs/afs.hpp
-		include/afs/afs-mem-alloc-tmp.hpp
 )
 target_link_libraries(afs INTERFACE
 	audiorw::audiorw
 	ez::ez
-	foonathan_memory
 	immer
 )
 if (BUILD_TESTING)

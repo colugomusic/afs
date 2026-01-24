@@ -4,6 +4,5 @@ include(CMakeFindDependencyMacro)
 find_dependency(audiorw)
 find_dependency(ez)
 find_dependency(Immer)
-find_dependency(foonathan_memory)
 
 include("${CMAKE_CURRENT_LIST_DIR}/afs-targets.cmake")
