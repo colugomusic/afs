@@ -1,13 +1,8 @@
 #pragma once
 
-#include "afs-mem-alloc-tmp.hpp"
-#include "jthread/jthread.hpp"
 #include <ads-vocab.hpp>
 #include <audiorw.hpp>
-#include <concepts>
 #include <ez.hpp>
-#include <filesystem>
-#include <foonathan/memory/container.hpp>
 #include <memory>
 #include <immer/table.hpp>
 
@@ -22,7 +17,6 @@ template <typename T> using uptr  = std::unique_ptr<T>;
 template <typename T, typename... Args> auto make_shptr(Args&&... args) { return std::make_shared<T>(std::forward<Args>(args)...); }
 template <typename T, typename... Args> auto make_uptr(Args&&... args)  { return std::make_unique<T>(std::forward<Args>(args)...); }
 
-template <typename T> using tmp_vec = foonathan::memory::vector<T, mem::alloc::tmp>;
 using output_signal = std::array<float*, 2>;
 
 } // afs
@@ -70,16 +64,16 @@ struct shared_safe {
 	detail::shared_atomics atomics;
 };
 
-template <audiorw::concepts::item_input_stream Stream>
+template <audiorw::concepts::item_input_stream Stream, typename JThread>
 struct loader {
 	uptr<Stream> stream;
-	std::jthread thread;
+	JThread thread;
 };
 
-template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE>
+template <audiorw::concepts::item_input_stream Stream, typename JThread, size_t CHUNK_SIZE>
 struct impl {
 	detail::shared_safe<CHUNK_SIZE> shared;
-	detail::loader<Stream> loader;
+	detail::loader<Stream, JThread> loader;
 	detail::servo servo;
 };
 
@@ -108,17 +102,17 @@ auto can_seek(const model<CHUNK_SIZE>& x) -> bool {
 	return x.header.frame_count.has_value();
 }
 
-template <size_t CHUNK_SIZE> [[nodiscard]] static
-auto get_chunk_info(const model<CHUNK_SIZE>& x, mem::alloc::tmp& alloc) -> tmp_vec<bool> {
-	auto list = tmp_vec<bool>{alloc};
-	list.reserve(x.loaded_chunks.size() * 2);
+template <size_t CHUNK_SIZE> static
+auto get_chunk_info(const model<CHUNK_SIZE>& x, auto reserve_fn, auto resize_fn, auto set_fn) -> void {
+	reserve_fn(x.loaded_chunks.size() * 2);
+	auto size = size_t{0};
 	for (const auto& chunk : x.loaded_chunks) {
-		if (chunk.id >= list.size()) {
-			list.resize(chunk.id + 1, false);
+		if (chunk.id >= size) {
+			size = chunk.id + 1;
+			resize_fn(size, false);
 		}
-		list[chunk.id] = true;
+		set_fn(chunk.id, true);
 	}
-	return list;
 }
 
 template <size_t CHUNK_SIZE> [[nodiscard]] static
@@ -129,8 +123,8 @@ auto get_estimated_frame_count(const model<CHUNK_SIZE>& x) -> ads::frame_count {
 	return x.estimated_frame_count;
 }
 
-template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE> [[nodiscard]] static
-auto can_seek(ez::nort_t th, const impl<Stream, CHUNK_SIZE>* x) -> bool {
+template <audiorw::concepts::item_input_stream Stream, typename JThread, size_t CHUNK_SIZE> [[nodiscard]] static
+auto can_seek(ez::nort_t th, const impl<Stream, JThread, CHUNK_SIZE>* x) -> bool {
 	return can_seek(x->shared.model.read(th));
 }
 
@@ -200,8 +194,8 @@ auto estimate_frame_count(ads::frame_count total_frames_read, size_t total_bytes
 	return {static_cast<uint64_t>(estimate)};
 }
 
-template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE> static
-auto load_proc(std::stop_token stop, detail::loader<Stream>* loader, detail::shared_safe<CHUNK_SIZE>* shared) -> void {
+template <audiorw::concepts::item_input_stream Stream, typename JThread, size_t CHUNK_SIZE> static
+auto load_proc(std::stop_token stop, detail::loader<Stream, JThread>* loader, detail::shared_safe<CHUNK_SIZE>* shared) -> void {
 	auto th                      = ez::nort;
 	auto current_chunk_idx       = size_t{0};
 	auto model                   = shared->model.read(th);
@@ -246,10 +240,10 @@ auto load_proc(std::stop_token stop, detail::loader<Stream>* loader, detail::sha
 	}
 }
 
-template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE> static
-auto init(ez::nort_t th, impl<Stream, CHUNK_SIZE>* x, Stream stream) -> void {
+template <audiorw::concepts::item_input_stream Stream, typename JThread, size_t CHUNK_SIZE> static
+auto init(ez::nort_t th, impl<Stream, JThread, CHUNK_SIZE>* x, Stream stream) -> void {
 	x->loader.stream = make_uptr<Stream>(std::move(stream));
-	x->loader.thread = std::jthread{load_proc<Stream, CHUNK_SIZE>, &x->loader, &x->shared};
+	x->loader.thread = std::jthread{load_proc<Stream, JThread, CHUNK_SIZE>, &x->loader, &x->shared};
 	x->shared.model.set_publish(th, make_initial_model<CHUNK_SIZE>(x->loader.stream->get_header()));
 }
 
@@ -346,43 +340,43 @@ auto process(ez::audio_t th, detail::servo* servo, detail::shared_atomics* atomi
 	}
 }
 
-template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE, size_t BUFFER_SIZE> static
-auto process(ez::audio_t th, impl<Stream, CHUNK_SIZE>* x, double SR, output_signal signal) -> void {
+template <audiorw::concepts::item_input_stream Stream, typename JThread, size_t CHUNK_SIZE, size_t BUFFER_SIZE> static
+auto process(ez::audio_t th, impl<Stream, JThread, CHUNK_SIZE>* x, double SR, output_signal signal) -> void {
 	return process<CHUNK_SIZE, BUFFER_SIZE>(th, &x->servo, &x->shared.atomics, *x->shared.model.read(th), SR, signal);
 }
 
-template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE> [[nodiscard]] static
-auto get_chunk_info(ez::nort_t th, impl<Stream, CHUNK_SIZE>* x, mem::alloc::tmp& alloc) -> tmp_vec<bool> {
-	return get_chunk_info(x->shared.model.read(th), alloc);
+template <audiorw::concepts::item_input_stream Stream, typename JThread, size_t CHUNK_SIZE> static
+auto get_chunk_info(ez::nort_t th, impl<Stream, JThread, CHUNK_SIZE>* x, auto reserve_fn, auto resize_fn, auto set_fn) -> void {
+	return get_chunk_info(x->shared.model.read(th), reserve_fn, resize_fn, set_fn);
 }
 
-template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE> [[nodiscard]] static
-auto get_estimated_frame_count(ez::nort_t th, impl<Stream, CHUNK_SIZE>* x) -> ads::frame_count {
+template <audiorw::concepts::item_input_stream Stream, typename JThread, size_t CHUNK_SIZE> [[nodiscard]] static
+auto get_estimated_frame_count(ez::nort_t th, impl<Stream, JThread, CHUNK_SIZE>* x) -> ads::frame_count {
 	return get_estimated_frame_count(x->shared.model.read(th));
 }
 
-template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE> [[nodiscard]] static
-auto is_playing(ez::nort_t th, const impl<Stream, CHUNK_SIZE>* x) -> bool {
+template <audiorw::concepts::item_input_stream Stream, typename JThread, size_t CHUNK_SIZE> [[nodiscard]] static
+auto is_playing(ez::nort_t th, const impl<Stream, JThread, CHUNK_SIZE>* x) -> bool {
 	return !x->shared.atomics.reported_finished.load(std::memory_order_relaxed);
 }
 
-template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE> [[nodiscard]] static
-auto get_header(ez::nort_t th, impl<Stream, CHUNK_SIZE>* x) -> audiorw::header {
+template <audiorw::concepts::item_input_stream Stream, typename JThread, size_t CHUNK_SIZE> [[nodiscard]] static
+auto get_header(ez::nort_t th, impl<Stream, JThread, CHUNK_SIZE>* x) -> audiorw::header {
 	return x->shared.model.read(th).header;
 }
 
-template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE> [[nodiscard]] static
-auto get_playback_pos(ez::nort_t th, impl<Stream, CHUNK_SIZE>* x) -> double {
+template <audiorw::concepts::item_input_stream Stream, typename JThread, size_t CHUNK_SIZE> [[nodiscard]] static
+auto get_playback_pos(ez::nort_t th, impl<Stream, JThread, CHUNK_SIZE>* x) -> double {
 	return x->shared.atomics.reported_playback_pos.load(std::memory_order_relaxed);
 }
 
-template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE, size_t BUFFER_SIZE> static
-auto seek(ez::nort_t th, impl<Stream, CHUNK_SIZE>* x, ads::frame_idx pos) -> void {
+template <audiorw::concepts::item_input_stream Stream, typename JThread, size_t CHUNK_SIZE, size_t BUFFER_SIZE> static
+auto seek(ez::nort_t th, impl<Stream, JThread, CHUNK_SIZE>* x, ads::frame_idx pos) -> void {
 	x->shared.model.update_publish(th, fn_seek<CHUNK_SIZE, BUFFER_SIZE>(pos));
 }
 
-template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE> static
-auto request_playback_pos(ez::nort_t th, impl<Stream, CHUNK_SIZE>* x) -> void {
+template <audiorw::concepts::item_input_stream Stream, typename JThread, size_t CHUNK_SIZE> static
+auto request_playback_pos(ez::nort_t th, impl<Stream, JThread, CHUNK_SIZE>* x) -> void {
 	x->shared.atomics.request_playback_pos.store(true, std::memory_order_relaxed);
 }
 
@@ -390,65 +384,65 @@ auto request_playback_pos(ez::nort_t th, impl<Stream, CHUNK_SIZE>* x) -> void {
 
 namespace afs {
 
-template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE, size_t BUFFER_SIZE>
+template <audiorw::concepts::item_input_stream Stream, typename JThread, size_t CHUNK_SIZE, size_t BUFFER_SIZE>
 struct streamer {
 	streamer(ez::nort_t, Stream stream);
-	[[nodiscard]] auto get_chunk_info(ez::nort_t, mem::alloc::tmp& alloc) const -> tmp_vec<bool>;
 	[[nodiscard]] auto get_estimated_frame_count(ez::nort_t) const -> ads::frame_count;
 	[[nodiscard]] auto get_header(ez::nort_t) const -> audiorw::header;
 	[[nodiscard]] auto get_playback_pos(ez::ui_t) -> double;
 	[[nodiscard]] auto is_playing(ez::nort_t) const -> bool;
+	auto get_chunk_info(ez::nort_t, auto reserve_fn, auto resize_fn, auto set_fn) const -> void;
 	auto process(ez::audio_t, double SR, output_signal stereo_out) -> void;
 	auto request_playback_pos(ez::nort_t) -> void;
 	auto seek(ez::nort_t, ads::frame_idx pos) -> void;
 private:
-	uptr<detail::impl<Stream, CHUNK_SIZE>> impl_;
+	uptr<detail::impl<Stream, JThread, CHUNK_SIZE>> impl_;
 };
 
-template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE, size_t BUFFER_SIZE>
-streamer<Stream, CHUNK_SIZE, BUFFER_SIZE>::streamer(ez::nort_t th, Stream stream)
-	: impl_{std::make_unique<detail::impl<Stream, CHUNK_SIZE>>()}
+template <audiorw::concepts::item_input_stream Stream, typename JThread, size_t CHUNK_SIZE, size_t BUFFER_SIZE>
+streamer<Stream, JThread, CHUNK_SIZE, BUFFER_SIZE>::streamer(ez::nort_t th, Stream stream)
+	: impl_{std::make_unique<detail::impl<Stream, JThread, CHUNK_SIZE>>()}
 {
 	detail::init(th, impl_.get(), std::move(stream));
 }
 
-template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE, size_t BUFFER_SIZE>
-auto streamer<Stream, CHUNK_SIZE, BUFFER_SIZE>::process(ez::audio_t th, double SR, output_signal stereo_out) -> void {
-	return detail::process<Stream, CHUNK_SIZE, BUFFER_SIZE>(th, impl_.get(), SR, stereo_out);
+template <audiorw::concepts::item_input_stream Stream, typename JThread, size_t CHUNK_SIZE, size_t BUFFER_SIZE>
+auto streamer<Stream, JThread, CHUNK_SIZE, BUFFER_SIZE>::process(ez::audio_t th, double SR, output_signal stereo_out) -> void {
+	return detail::process<Stream, JThread, CHUNK_SIZE, BUFFER_SIZE>(th, impl_.get(), SR, stereo_out);
 }
 
-template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE, size_t BUFFER_SIZE>
-auto streamer<Stream, CHUNK_SIZE, BUFFER_SIZE>::get_chunk_info(ez::nort_t th, mem::alloc::tmp& alloc) const -> tmp_vec<bool> {
-	return detail::get_chunk_info(th, impl_.get(), alloc);
+template <audiorw::concepts::item_input_stream Stream, typename JThread, size_t CHUNK_SIZE, size_t BUFFER_SIZE>
+auto streamer<Stream, JThread, CHUNK_SIZE, BUFFER_SIZE>::get_chunk_info(ez::nort_t th, auto reserve_fn, auto resize_fn, auto set_fn) const -> void {
+	return detail::get_chunk_info(th, impl_.get(), reserve_fn, resize_fn, set_fn);
 }
 
-template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE, size_t BUFFER_SIZE>
-auto streamer<Stream, CHUNK_SIZE, BUFFER_SIZE>::get_estimated_frame_count(ez::nort_t th) const -> ads::frame_count {
+template <audiorw::concepts::item_input_stream Stream, typename JThread, size_t CHUNK_SIZE, size_t BUFFER_SIZE>
+auto streamer<Stream, JThread, CHUNK_SIZE, BUFFER_SIZE>::get_estimated_frame_count(ez::nort_t th) const -> ads::frame_count {
 	return detail::get_estimated_frame_count(th, impl_.get());
 }
 
-template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE, size_t BUFFER_SIZE>
-auto streamer<Stream, CHUNK_SIZE, BUFFER_SIZE>::get_header(ez::nort_t th) const -> audiorw::header {
+template <audiorw::concepts::item_input_stream Stream, typename JThread, size_t CHUNK_SIZE, size_t BUFFER_SIZE>
+auto streamer<Stream, JThread, CHUNK_SIZE, BUFFER_SIZE>::get_header(ez::nort_t th) const -> audiorw::header {
 	return detail::get_header(th, impl_.get());
 }
 
-template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE, size_t BUFFER_SIZE>
-auto streamer<Stream, CHUNK_SIZE, BUFFER_SIZE>::get_playback_pos(ez::ui_t) -> double {
+template <audiorw::concepts::item_input_stream Stream, typename JThread, size_t CHUNK_SIZE, size_t BUFFER_SIZE>
+auto streamer<Stream, JThread, CHUNK_SIZE, BUFFER_SIZE>::get_playback_pos(ez::ui_t) -> double {
 	return detail::get_playback_pos(ez::ui, impl_.get());
 }
 
-template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE, size_t BUFFER_SIZE>
-auto streamer<Stream, CHUNK_SIZE, BUFFER_SIZE>::is_playing(ez::nort_t th) const -> bool {
+template <audiorw::concepts::item_input_stream Stream, typename JThread, size_t CHUNK_SIZE, size_t BUFFER_SIZE>
+auto streamer<Stream, JThread, CHUNK_SIZE, BUFFER_SIZE>::is_playing(ez::nort_t th) const -> bool {
 	return detail::is_playing(th, impl_.get());
 }
 
-template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE, size_t BUFFER_SIZE>
-auto streamer<Stream, CHUNK_SIZE, BUFFER_SIZE>::seek(ez::nort_t th, ads::frame_idx pos) -> void {
-	return detail::seek<Stream, CHUNK_SIZE, BUFFER_SIZE>(th, impl_.get(), pos);
+template <audiorw::concepts::item_input_stream Stream, typename JThread, size_t CHUNK_SIZE, size_t BUFFER_SIZE>
+auto streamer<Stream, JThread, CHUNK_SIZE, BUFFER_SIZE>::seek(ez::nort_t th, ads::frame_idx pos) -> void {
+	return detail::seek<Stream, JThread, CHUNK_SIZE, BUFFER_SIZE>(th, impl_.get(), pos);
 }
 
-template <audiorw::concepts::item_input_stream Stream, size_t CHUNK_SIZE, size_t BUFFER_SIZE>
-auto streamer<Stream, CHUNK_SIZE, BUFFER_SIZE>::request_playback_pos(ez::nort_t th) -> void {
+template <audiorw::concepts::item_input_stream Stream, typename JThread, size_t CHUNK_SIZE, size_t BUFFER_SIZE>
+auto streamer<Stream, JThread, CHUNK_SIZE, BUFFER_SIZE>::request_playback_pos(ez::nort_t th) -> void {
 	return detail::request_playback_pos(th, impl_.get());
 }
 
