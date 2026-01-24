@@ -8,7 +8,7 @@ static const auto TEST_WAV = std::filesystem::path{ASSETS_DIR} / "test.wav";
 TEST_CASE("compiles") {
 	static constexpr auto CHUNK_SIZE  = afs::DEFAULT_CHUNK_SIZE;
 	static constexpr auto BUFFER_SIZE = 64;
-	using streamer = afs::streamer<audiorw::stream_item_from_fs_path, std::jthread, CHUNK_SIZE, BUFFER_SIZE>;
+	using streamer = afs::streamer<audiorw::stream_item_from_fs_path, std::jthread, std::stop_token, CHUNK_SIZE, BUFFER_SIZE>;
 	if (const auto format_hint = audiorw::make_format_hint(TEST_WAV, true)) {
 		auto stream = audiorw::stream::item::from(TEST_WAV, *format_hint);
 		auto test_streamer = streamer{ez::ui, std::move(stream)};
