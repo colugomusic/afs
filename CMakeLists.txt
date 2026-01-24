@@ -13,6 +13,7 @@ target_sources(afs PUBLIC
 		include/afs
 	FILES
 		include/afs/afs.hpp
+		include/afs/afs-mem-alloc-tmp.hpp
 )
 target_link_libraries(afs INTERFACE
 	audiorw::audiorw
