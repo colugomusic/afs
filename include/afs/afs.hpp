@@ -243,7 +243,7 @@ auto load_proc(StopToken stop, detail::loader<Stream, JThread>* loader, detail::
 template <audiorw::concepts::item_input_stream Stream, typename JThread, typename StopToken, size_t CHUNK_SIZE> static
 auto init(ez::nort_t th, impl<Stream, JThread, CHUNK_SIZE>* x, Stream stream) -> void {
 	x->loader.stream = make_uptr<Stream>(std::move(stream));
-	x->loader.thread = std::jthread{load_proc<Stream, JThread, StopToken, CHUNK_SIZE>, &x->loader, &x->shared};
+	x->loader.thread = JThread{load_proc<Stream, JThread, StopToken, CHUNK_SIZE>, &x->loader, &x->shared};
 	x->shared.model.set_publish(th, make_initial_model<CHUNK_SIZE>(x->loader.stream->get_header()));
 }
 
