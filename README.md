@@ -15,6 +15,12 @@ This is the file streamer used in Blockhead's file browser. If you like the way 
 
 `streamer(ez::nort_t, Stream stream)`
 
+You can create your streamer type with something like:
+
+`using streamer = afs::streamer<audiorw::stream_item_from_fs_path, std::jthread, std::stop_token, afs::DEFAULT_CHUNK_SIZE, 64>;`
+
+The reason for passing in `std::jthread` and `std::stop_token` as template arguments is to work around the fact that AppleClang still doesn't support that stuff (as of the time of writing.) So you can pass in your drop-in replacement to use instead. (I use Nico Josuttis' reference implementation from his github.)
+
 `Stream` is anything that satisfies the `audiorw::concepts::item_input_stream` concept. `audiorw` provides `audiorw::stream_item_from_bytes` and `audiorw::stream_item_from_fs_path`.
 
 `[[nodiscard]] auto get_chunk_info(ez::nort_t, afs::tmp_alloc& alloc) const -> afs::tmp_vec<bool>`
