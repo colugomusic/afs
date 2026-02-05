@@ -287,6 +287,9 @@ auto playback_single_chunk(ez::audio_t th, detail::servo* servo, detail::shared_
 		servo->playback_pos += BUFFER_SIZE * frame_inc;
 		finish_if_reached_end(th, servo, atomics, model);
 	}
+	if (model.header.channel_count < 2) {
+		std::ranges::copy_n(signal.at(0), BUFFER_SIZE, signal.at(1));
+	}
 }
 
 template <size_t CHUNK_SIZE, size_t BUFFER_SIZE> static
@@ -305,6 +308,9 @@ auto playback_chunk_transition(ez::audio_t th, detail::servo* servo, detail::sha
 			signal_row[i] = std::lerp(value_a, value_b, fr_t);
 			fr += frame_inc;
 		}
+	}
+	if (model.header.channel_count < 2) {
+		std::ranges::copy_n(signal.at(0), BUFFER_SIZE, signal.at(1));
 	}
 	servo->playback_pos += BUFFER_SIZE * frame_inc;
 	finish_if_reached_end(th, servo, atomics, model);
