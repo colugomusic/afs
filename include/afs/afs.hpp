@@ -35,7 +35,7 @@ struct target {
 template <size_t CHUNK_SIZE>
 struct chunk {
 	size_t id = 0; // The ID is also the chunk index.
-	shptr<const ads::stereo<float, CHUNK_SIZE>> data;
+	shptr<const ads::data<float, ads::DYNAMIC_EXTENT, CHUNK_SIZE>> data;
 };
 
 template <size_t CHUNK_SIZE>
@@ -219,7 +219,7 @@ auto load_proc(StopToken stop, detail::loader<Stream, JThread>* loader, detail::
 			end_chunk = current_chunk_idx;
 			just_found_end_chunk = true;
 		}
-		auto chunk_data = make_shptr<ads::stereo<float, CHUNK_SIZE>>();
+		auto chunk_data = make_shptr<ads::data<float, ads::DYNAMIC_EXTENT, CHUNK_SIZE>>(ads::make<float, CHUNK_SIZE>(channel_count));
 		ads::deinterleave(interleaved, chunk_data->begin());
 		auto chunk = detail::chunk<CHUNK_SIZE>{
 			.id   = current_chunk_idx,
