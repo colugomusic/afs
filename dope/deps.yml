@@ -6,7 +6,6 @@
   git:                 https://github.com/colugomusic/ez.git
   track:               true
 
-- name:                Immer
-  git:                 https://github.com/arximboldi/immer.git
-  tag:                 v0.8.1
-  cmake-options:       -Dimmer_BUILD_DOCS=OFF -Dimmer_BUILD_TESTS=OFF -Dimmer_BUILD_EXAMPLES=OFF -Dimmer_BUILD_EXTRAS=OFF
+- name: Immer
+  url: https://github.com/arximboldi/immer/archive/refs/tags/v0.9.1.zip
+  cmake-options: -Dimmer_BUILD_DOCS=OFF -Dimmer_BUILD_TESTS=OFF -Dimmer_BUILD_EXAMPLES=OFF -Dimmer_BUILD_EXTRAS=OFF
