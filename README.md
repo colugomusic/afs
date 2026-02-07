@@ -45,7 +45,7 @@ Returns false if the playback got to the end. The playback automatically stops i
 
 `auto process(ez::audio_t, double SR, afs::output_signal stereo_out) -> void`
 
-This is the realtime-safe audio processing function. `afs::output_signal` is `std::array<float*, 2>` for your two channels of audio data. If the input stream is mono then only the first buffer is written to. If you feel like forking the library, it would be pretty easy to support a dynamic number of channels. I just don't need it myself, yet.
+This is the realtime-safe audio processing function. `afs::output_signal` is `std::array<float*, 2>` for your two channels of audio data. If the input stream is mono then it is converted to stereo. If you feel like forking the library, it would be pretty easy to support a dynamic number of channels. I just don't need it myself, yet.
 
 `auto request_playback_pos(ez::nort_t) -> void`
 
