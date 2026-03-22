@@ -1,5 +1,5 @@
 CompileFlags:
-  CompilationDatabase: z:/dv/_bld/afs-ninja-msvc
+  CompilationDatabase: z:/dv/_bld/afs-dbg
   Add: -Wunused-function
 
 Diagnostics:
