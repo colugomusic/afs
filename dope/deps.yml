@@ -1,10 +1,12 @@
-- name:                audiorw
-  git:                 https://github.com/colugomusic/audiorw.git
-  track:               true
+- name: audiorw
+  git: https://github.com/colugomusic/audiorw.git
+  tag: 32f7870518e9710d3e328d330a274136c780864b
+  track: true
 
-- name:                ez
-  git:                 https://github.com/colugomusic/ez.git
-  track:               true
+- name: ez
+  git: https://github.com/colugomusic/ez.git
+  tag: ef98dbb18d463618058e64171a07d9de6ef338af
+  track: true
 
 - name: Immer
   url: https://github.com/arximboldi/immer/archive/refs/tags/v0.9.1.zip
