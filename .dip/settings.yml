@@ -1,0 +1,7 @@
+name: afs
+cfgs:
+  dbg:
+    cmake-config: Debug
+  rel:
+    cmake-config: RelWithDebInfo
+
